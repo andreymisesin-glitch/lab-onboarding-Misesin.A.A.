@@ -30,4 +30,4 @@ while i <= 10:
 Исправил код в src/fixed_transaction.py, добавил инициализацию status и обернул файл в with open.
 
 Ссылка на мой Pull Request: 
-[ВСТАВЬ СЮДА ССЫЛКУ]
+[Ссылка на Pull Request](https://github.com/andrey-misesin-glitch/lab-onboarding-Misesin.A.A./pull/4)
