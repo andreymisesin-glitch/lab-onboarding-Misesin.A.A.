@@ -1,7 +1,6 @@
 
 def process_transaction(user_id, amount, db_connection):
     status = "pending"
-    log_entry = "Start processing"
 
     if amount > 0:
         status = "approved"
