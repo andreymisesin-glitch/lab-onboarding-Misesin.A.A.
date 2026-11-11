@@ -22,8 +22,8 @@ call :log "========================================"
 :: --- Сведения об ОС ---
 set "OS_CAPTION="
 set "OS_VERSION="
-for /f "usebackq tokens=1,* delims=:" %%A in (`powershell -Command "(Get-CimInstance Win32_OperatingSystem).Caption"`) do set "OS_CAPTION=%%A"
-for /f "usebackq tokens=1,* delims=:" %%A in (`powershell -Command "(Get-CimInstance Win32_OperatingSystem).Version"`) do set "OS_VERSION=%%A"
+for /f "usebackq tokens=*" %%A in (`powershell -Command "(Get-CimInstance Win32_OperatingSystem).Caption"`) do set "OS_CAPTION=%%A"
+for /f "usebackq tokens=*" %%A in (`powershell -Command "(Get-CimInstance Win32_OperatingSystem).Version"`) do set "OS_VERSION=%%A"
 
 if defined OS_CAPTION (
     call :log "Операционная система: !OS_CAPTION! (Версия: !OS_VERSION!)"
@@ -72,18 +72,10 @@ call :log "========================================"
 call :log "Сбор списка установленных программ..."
 echo Идет опрос реестра, это может занять пару минут...
 
-:: Очищаем временный файл
 break > "%TEMP_APPS%"
+for /f "tokens=3*" %%A in ('reg query "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall" /s /v DisplayName 2^>nul ^| findstr "DisplayName"') do echo %%A %%B >> "%TEMP_APPS%"
+for /f "tokens=3*" %%A in ('reg query "HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" /s /v DisplayName 2^>nul ^| findstr "DisplayName"') do echo %%A %%B >> "%TEMP_APPS%"
 
-:: Получаем названия программ из 64-битной и 32-битной веток реестра
-for /f "tokens=3*" %%A in ('reg query "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall" /s /v DisplayName 2^>nul ^| findstr "DisplayName"') do (
-    echo %%A %%B >> "%TEMP_APPS%"
-)
-for /f "tokens=3*" %%A in ('reg query "HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" /s /v DisplayName 2^>nul ^| findstr "DisplayName"') do (
-    echo %%A %%B >> "%TEMP_APPS%"
-)
-
-:: Сортируем и убираем дубликаты
 sort "%TEMP_APPS%" /O "%TEMP_APPS%"
 call :log "Список программ успешно собран."
 
@@ -147,7 +139,6 @@ if errorlevel 1 (
     call :log "[+] Антивирус обнаружен."
 )
 
-
 :: ==========================================
 :: БЛОК 4: АНАЛИЗ ИЗЛИШНЕГО ПО
 :: ==========================================
@@ -156,55 +147,51 @@ call :log "АНАЛИЗ ИЗЛИШНЕГО ПО (Рекомендации по �
 call :log "========================================"
 call :log "Внимание: список ниже является рекомендацией к проверке, а не указанием к удалению."
 
-:: 1. Игры
 call :log "--- Игровое ПО ---"
 findstr /I /C:"Steam" /C:"Epic Games" /C:"GOG" /C:"Origin" /C:"Ubisoft" /C:"Battle.net" /C:"Riot" /C:"game" "%TEMP_APPS%" > "%TEMP_APPS%_temp"
-if %ERRORLEVEL% EQU 0 (
+if errorlevel 1 (
+    call :log "Игровое ПО не обнаружено."
+) else (
     type "%TEMP_APPS%_temp"
     type "%TEMP_APPS%_temp" >> "%REPORT_FILE%"
     set /a REC_COUNT+=1
-) else (
-    call :log "Игровое ПО не обнаружено."
 )
 
-:: 2. Торренты
 call :log "--- Торрент-клиенты ---"
 findstr /I /C:"torrent" /C:"uTorrent" /C:"BitTorrent" /C:"qBittorrent" /C:"Vuze" "%TEMP_APPS%" > "%TEMP_APPS%_temp"
-if %ERRORLEVEL% EQU 0 (
+if errorlevel 1 (
+    call :log "Торрент-клиенты не обнаружены."
+) else (
     type "%TEMP_APPS%_temp"
     type "%TEMP_APPS%_temp" >> "%REPORT_FILE%"
     call :log "Внимание: торрент-клиенты создают нагрузку на сеть. Проверьте необходимость."
     set /a REC_COUNT+=1
-) else (
-    call :log "Торрент-клиенты не обнаружены."
 )
 
-:: 3. Мессенджеры
-call :log "--- Мессенджеры (Личное общение) ---"
+call :log "--- Мессенджеры ---"
 findstr /I /C:"Discord" /C:"Telegram" /C:"WhatsApp" /C:"Viber" /C:"Skype" "%TEMP_APPS%" > "%TEMP_APPS%_temp"
-if %ERRORLEVEL% EQU 0 (
+if errorlevel 1 (
+    call :log "Сторонние мессенджеры не обнаружены."
+) else (
     type "%TEMP_APPS%_temp"
     type "%TEMP_APPS%_temp" >> "%REPORT_FILE%"
     call :log "Внимание: данные мессенджеры могут не входить в корпоративный стандарт."
     set /a REC_COUNT+=1
-) else (
-    call :log "Сторонние мессенджеры не обнаружены."
 )
 
-:: 4. Развлечения и оформление
-call :log "--- Развлекательное ПО и твикеры ---"
+call :log "--- Развлекательное ПО ---"
 findstr /I /C:"Wallpaper Engine" /C:"OBS" /C:"Soundpad" "%TEMP_APPS%" > "%TEMP_APPS%_temp"
-if %ERRORLEVEL% EQU 0 (
+if errorlevel 1 (
+    call :log "Развлекательное ПО не обнаружено."
+) else (
     type "%TEMP_APPS%_temp"
     type "%TEMP_APPS%_temp" >> "%REPORT_FILE%"
     set /a REC_COUNT+=1
-) else (
-    call :log "Развлекательное ПО не обнаружено."
 )
 
 :: Удаляем временные файлы
-del "%TEMP_APPS%" >nul 2>&1
-del "%TEMP_APPS%_temp" >nul 2>&1
+if exist "%TEMP_APPS%" del "%TEMP_APPS%"
+if exist "%TEMP_APPS%_temp" del "%TEMP_APPS%_temp"
 
 :: ==========================================
 :: БЛОК 5: ИТОГИ
@@ -224,11 +211,13 @@ exit /b
 :: ==========================================
 :log
 set "log_text=%~1"
-if "%~1"=="" (
-    echo(
-    echo( >> "%REPORT_FILE%"
+if "%log_text%"=="" (
+    echo.
+    echo. >> "%REPORT_FILE%"
 ) else (
-    echo %log_text%
-    echo %log_text% >> "%REPORT_FILE%"
+    setlocal enabledelayedexpansion
+    echo !log_text!
+    echo !log_text! >> "%REPORT_FILE%"
+    endlocal
 )
 exit /b
